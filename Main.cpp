@@ -7,6 +7,7 @@ namespace Main
 
 	uintptr_t ModuleBase;
 	uintptr_t CriticalLogFunc;
+	uintptr_t SomeOtherLogFunc;
 
 	DWORD WINAPI Init(void* const(param))
 	{
@@ -25,8 +26,10 @@ namespace Main
 		cout << "                                                               |___// |___//            " << endl << endl;
 
 		ModuleBase = reinterpret_cast<uintptr_t>(GetModuleHandle(nullptr));
-		CriticalLogFunc = ModuleBase + 0x62760; //pattern: 
+		CriticalLogFunc = ModuleBase + 0x62760; //pattern: 55 8B EC 83 E4 F8 B8 1C 40 00 00 E8 ?? ?? ?? ?? A1 ?? ?? ?? ??
+		SomeOtherLogFunc = ModuleBase + 0x62840; //pattern: 
 		std::cout << "CriticalLogFunc 0x" << std::hex << CriticalLogFunc << std::endl;
+		std::cout << "SomeOtherLogFunc 0x" << std::hex << SomeOtherLogFunc << std::endl;
 
 		InjectHook();
 
@@ -51,7 +54,16 @@ namespace Main
 			VirtualProtect((LPVOID)(CriticalLogFunc + 1), 1, dwOld, &dwOld);
 			cout << "placing int3 at 0x" << hex << CriticalLogFunc << endl;
 		}
-		
+		if (SomeOtherLogFunc != NULL)
+		{
+			/*
+			VirtualProtect((LPVOID)(SomeOtherLogFunc + 1), 1, PAGE_EXECUTE_READWRITE, &dwOld);
+			*(BYTE*)(SomeOtherLogFunc) = 0xCC;
+			VirtualProtect((LPVOID)(SomeOtherLogFunc + 1), 1, dwOld, &dwOld);
+			cout << "placing int3 at 0x" << hex << SomeOtherLogFunc << endl;
+			*/
+		}
+
 		return;
 	}
 
@@ -78,35 +90,20 @@ namespace Main
 		auto ctx = exceptionInfo->ContextRecord;
 		auto cer = exceptionInfo->ExceptionRecord;
 
-		if (ctx->Eip == CriticalLogFunc && (cer->ExceptionCode == STATUS_SINGLE_STEP || cer->ExceptionCode == STATUS_BREAKPOINT))
+		if (ctx->Eip == CriticalLogFunc || ctx->Eip == SomeOtherLogFunc && (cer->ExceptionCode == STATUS_SINGLE_STEP || cer->ExceptionCode == STATUS_BREAKPOINT))
 		{
 			char* format = *(char**)(ctx->Esp + 0x04); //obtain string ptr from stack
+			//cout << ">" << format << endl;
 
 			//prtinf source
 			char* traverse;
-			signed long i;
+			signed int i; //unsugned int i;
 			char* s;
 
 			int ArgUsed = 0;
 
-			bool BlackList = true;
-			char BadWord[] = "OnBeforeNavigationCanvas";	//blacklist this one, somehow it crashes here
-			uintptr_t CharPtr = *(uintptr_t*)(ctx->Esp + 0x04);
-			for (int i = 0; i < 10; i++)
-			{
-				//cout << *(char*)(CharPtr+i) << " != " << BadWord[i] << endl; //debugging it is
-				if (*(char*)(CharPtr + i) != BadWord[i])
-				{
-					BlackList = false;
-					break;
-				}
-			}
-
 			for (traverse = format; *traverse != '\0'; traverse++)
 			{
-				if (BlackList)
-					break;
-
 				while (*traverse != '%')
 				{
 					cout << *traverse;
@@ -132,25 +129,46 @@ namespace Main
 						}
 						cout << convert(i, 10);
 						break;
+					case 'u': i = *(unsigned int*)(ctx->Esp + 0x08 + (ArgUsed * 0x04)); 			//Fetch Decimal/Integer argument
+						ArgUsed++;
+						cout << i;
+						break;
 
 					case 'o': i = *(int*)(ctx->Esp + 0x08 + (ArgUsed * 0x04));			//Fetch Octal representation
 						ArgUsed++;
 						cout << convert(i, 8);
 						break;
 
-					case 's': s = *(char**)(ctx->Esp + 0x08 + (ArgUsed * 0x04)); 		//Fetch string
+					case 's': s = *(char**)(ctx->Esp + 0x08 + (ArgUsed * 0x04)); 		//Fetch string, its fucked when there s a wrong ptr given due to a unkown % value
 						ArgUsed++;
-						cout << s;
+						if (s != NULL && s > 0x00)
+							cout << s;
+						else
+							cout << "%s";
 						break;
 
 					case 'x': i = *(int*)(ctx->Esp + 0x08 + (ArgUsed * 0x04));			 //Fetch Hexadecimal representation
 						ArgUsed++;
 						cout << convert(i, 16);
 						break;
+					case 'I': i = *(int*)(ctx->Esp + 0x08 + (ArgUsed * 0x04));			 //%I64d hmmm?
+						ArgUsed++;
+						cout << convert(i, 10);
+						break;
 				}
 			}
 			cout << endl;
 
+			//restore: push ebp
+			ctx->Esp -= 4;
+			*(DWORD*)ctx->Esp = ctx->Ebp;
+			ctx->Eip += 1;
+
+			return EXCEPTION_CONTINUE_EXECUTION;
+		}
+		else if (ctx->Eip == SomeOtherLogFunc || ctx->Eip == SomeOtherLogFunc && (cer->ExceptionCode == STATUS_SINGLE_STEP || cer->ExceptionCode == STATUS_BREAKPOINT))
+		{
+			cout << *(wchar_t**)(ctx->Esp + 0x04);
 			//restore: push ebp
 			ctx->Esp -= 4;
 			*(DWORD*)ctx->Esp = ctx->Ebp;
