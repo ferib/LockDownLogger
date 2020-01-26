@@ -129,9 +129,9 @@ namespace Main
 						}
 						cout << convert(i, 10);
 						break;
-					case 'u': i = *(unsigned int*)(ctx->Esp + 0x08 + (ArgUsed * 0x04)); 			//Fetch Decimal/Integer argument
+					case 'u': i = *(unsigned int*)(ctx->Esp + 0x08 + (ArgUsed * 0x04)); //Fetch Decimal/Integer argument
 						ArgUsed++;
-						cout << i;
+						cout << convert(i, 10);
 						break;
 
 					case 'o': i = *(int*)(ctx->Esp + 0x08 + (ArgUsed * 0x04));			//Fetch Octal representation
