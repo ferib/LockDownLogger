@@ -6,8 +6,10 @@ namespace Main
 	using namespace std;
 
 	uintptr_t ModuleBase;
+	uintptr_t LockDownBrowser_DLL;
 	uintptr_t CriticalLogFunc;
 	uintptr_t SomeOtherLogFunc;
+	uintptr_t LDB_KeyboardHook;
 
 	DWORD WINAPI Init(void* const(param))
 	{
@@ -26,10 +28,14 @@ namespace Main
 		cout << "                                                               |___/ |___/            " << endl << endl;
 
 		ModuleBase = reinterpret_cast<uintptr_t>(GetModuleHandle(nullptr));
-		CriticalLogFunc = ModuleBase + 0x62760; //pattern: 55 8B EC 83 E4 F8 B8 1C 40 00 00 E8 ?? ?? ?? ?? A1 ?? ?? ?? ??
+		LockDownBrowser_DLL = reinterpret_cast<uintptr_t>(GetModuleHandle(L"LockDownBrowser.dll"));
+
+		CriticalLogFunc = ModuleBase + 0x062760; //pattern: 55 8B EC 83 E4 F8 B8 1C 40 00 00 E8 ?? ?? ?? ?? A1 ?? ?? ?? ??
 		SomeOtherLogFunc = ModuleBase + 0x62840; //pattern: 
+		LDB_KeyboardHook = LockDownBrowser_DLL + 0x11C0; //CodeCave used by LDB for preventing alt+tab
 		std::cout << "CriticalLogFunc 0x" << std::hex << CriticalLogFunc << std::endl;
 		std::cout << "SomeOtherLogFunc 0x" << std::hex << SomeOtherLogFunc << std::endl;
+		std::cout << "KeyboardHook_LL 0x" << std::hex << LDB_KeyboardHook << std::endl;
 
 		InjectHook();
 
@@ -62,6 +68,15 @@ namespace Main
 			VirtualProtect((LPVOID)(SomeOtherLogFunc + 1), 1, dwOld, &dwOld);
 			cout << "placing int3 at 0x" << hex << SomeOtherLogFunc << endl;
 			*/
+		}
+		if (LDB_KeyboardHook != NULL)
+		{
+			
+			VirtualProtect((LPVOID)(LDB_KeyboardHook + 1), 1, PAGE_EXECUTE_READWRITE, &dwOld);
+			*(BYTE*)(LDB_KeyboardHook) = 0xC3;
+			VirtualProtect((LPVOID)(LDB_KeyboardHook + 1), 1, dwOld, &dwOld);
+			cout << "placing ret at 0x" << hex << LDB_KeyboardHook << endl;
+			
 		}
 
 		return;
