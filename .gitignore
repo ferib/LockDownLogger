@@ -1,0 +1,14 @@
+/bin
+/obj
+/Debug
+/x64
+*.lock
+*.ide
+*.ide-shm
+*.ide-wal
+*.txt
+*.cache
+*.pdb
+*.exe
+*.config
+.vs
