@@ -3,4 +3,4 @@ Small DLL hooking Respondus LockDownBrowser functions in order to obtain more in
 Grab a tinfoil hat and start looking at what kind of weird stuff LockDownBrowser is logging!
 
 # Result
-https://github.com/ferib/LockDownLogger/blob/master/img/result.png?raw=true
+![img](https://github.com/ferib/LockDownLogger/blob/master/img/result.png?raw=true)
